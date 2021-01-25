@@ -1,0 +1,16 @@
+#if not using fail2ban then can use a nodeport saervice
+kind: Service
+apiVersion: v1
+metadata:
+  name: sftp
+  labels:
+    role: sftp
+spec:
+  type: NodePort
+  ports:
+  - name: ssh
+    port: 30022
+    targetPort: 22
+    nodePort: 30022
+  selector:
+    ops: sftp

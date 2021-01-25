@@ -1,0 +1,75 @@
+kind: Deployment
+apiVersion: apps/v1beta2
+metadata:
+  name: sftp
+  labels:
+    role: sftp
+spec:
+  selector:
+    matchLabels:
+      role: sftp
+  template:
+    metadata:
+      labels:
+        role: sftp
+    spec:
+      #secrets and config
+      volumes:
+      # NFS example, can be a PVC as well
+      # - name: sftp-data
+      #   nfs:
+      #     # TODO: See README for why name won't work here and why IP is needed
+      #     server: 10.43.1.123
+      #     path: "/"
+
+      #Simple host path example
+      - name: sftp-vol
+        hostPath:
+          path: "/data/sftp"
+          type: DirectoryOrCreate
+      - name: sftp-host-keys
+        secret:
+          secretName: sftp-host-keys
+          defaultMode: 0600
+      - name: sftp-user-keys
+        secret:
+          secretName: sftp-user-keys
+          defaultMode: 0600
+      - name: sftp-user-conf
+        secret:
+          secretName: sftp-user-conf
+          defaultMode: 0600
+      containers:
+      #the sftp server itself
+      - name: sftp
+        image: yakworks/sftp:latest
+        imagePullPolicy: Always
+        env:
+          - name: DATA_MOUNT
+            value: /sftp-data
+        ports:
+          - name: ssh
+            containerPort: 22
+            # map to hostPost to skip kub-proxy so fail2ban can see ip
+            hostPort: 9922
+        securityContext:
+          # privileged=true is nuclear approach if capabilities is not working
+          # privileged: true
+          capabilities:
+            add: ["SYS_ADMIN", "NET_ADMIN", "NET_BIND_SERVICE"]
+        volumeMounts:
+        - mountPath: /etc/ssh/ssh_host_ed25519_key
+          name: sftp-host-keys
+          subPath: ssh_host_ed25519_key
+          readOnly: true
+        - mountPath: /etc/ssh/ssh_host_rsa_key
+          name: sftp-host-keys
+          subPath: ssh_host_rsa_key
+          readOnly: true
+        - mountPath: /etc/sftp/users.conf
+          name: sftp-user-conf
+          subPath: users.conf
+        - mountPath: /etc/sftp/authorized_keys.d
+          name: sftp-user-keys
+        - mountPath: /sftp-data
+          name: sftp-vol
